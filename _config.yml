@@ -9,7 +9,7 @@
 title: I am Cat Slave. # ex. I m Chuan
 name: Cat Slave # ex. DONGChuan
 email: yangjj@rekchina.com
-#location: My location # ex. Nice, France
+location: Nice, Xiamen # ex. Nice, France
 company: Xiamen Rek Technology Co,.Ltd.
 #company_url: my_company
 github_url: https://github.com/catslave # ex. https://github.com/DONGChuan
@@ -32,7 +32,7 @@ gems:
 
 # Build settings
 markdown: kramdown
-highlighter: rouge
+highlighter: rouge # rouge
 lsi:         false
 excerpt_separator: "\n\n"
 
@@ -59,21 +59,21 @@ navs:
     href: /
     label: Home
 
-  -
-    href: /open-source
-    label: Open-Source
+  #-
+    #href: /open-source
+    #label: Open-Source
 
   -
     href: /blog
     label: Blog
 
-  -
-    href: /bookmark
-    label: Bookmark
+  #-
+    #href: /bookmark
+    #label: Bookmark
 
-  -
-    href: /about
-    label: About
+  #-
+    #href: /about
+    #label: About
 
 # Sidebar to show popular repo
 side_bar_repo_limit: 5 # Number of repos to show
@@ -86,7 +86,7 @@ side_bar_repo_limit: 5 # Number of repos to show
 
 
 # For about.html. Fell free to create your own!
-skill_software_keywords: [Java, C, C++, Qt, Python, MySQL, Oracle, SQLite, PL/SQL, Design Patterns]
-skill_j2ee_keywords: [Spring, Struct, Hibernet, MyBatis, JSP]
-skill_web_keywords: [HTML, CSS, JS, JQuery, Ajax, AngularJS, NodeJS, ExpressJS, MongoDB, Redis, PHP, Symfony, Boostrap]
-skill_mobile_app_keywords: [Android, Sketch UI Desgin]
+# skill_software_keywords: [Java, C, C++, Qt, Python, MySQL, Oracle, SQLite, PL/SQL, Design Patterns]
+# skill_j2ee_keywords: [Spring, Struct, Hibernet, MyBatis, JSP]
+# skill_web_keywords: [HTML, CSS, JS, JQuery, Ajax, AngularJS, NodeJS, ExpressJS, MongoDB, Redis, PHP, Symfony, Boostrap]
+# skill_mobile_app_keywords: [Android, Sketch UI Desgin]
