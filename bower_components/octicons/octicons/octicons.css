@@ -26,11 +26,6 @@
   -ms-user-select: none;
   user-select: none;
 }
-<<<<<<< HEAD
-/*.mega-octicon { font-size: 32px; }*/
-=======
-#.mega-octicon { font-size: 32px; }
->>>>>>> bc8f4a2740348c82adec7be62b30aa42dad7c4e7
 .mega-octicon { font-size: 13px; }
 
 .octicon-alert:before { content: '\f02d'} /*  */
