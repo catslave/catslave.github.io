@@ -7,6 +7,106 @@ description: MySQL技术内幕InnoDB存储引擎 读书笔记
 
 # MySQL技术内幕InnoDB存储引擎
 
+# 1. MySQL体系结构和存储引擎
+MySQL是一个单进程多线程结构的数据库（SQL Server也是，Oracle在Windows上是）。MySQL数据库
+实例在系统上的表现就是一个进程。MySQL实例启动时，会去读取配置文件，如果没有配置文件，会按照
+编译时的默认参数设置启动实例（Oracle启动时读取不到配置文件会报错，MySQL通过命令 
+mysql --help | grep my.cnf 查找配置文件）。如果有多个配置文件存储，MySQL会以最后一个
+配置文件中的参数为准。
+
+## MSQL体系结构
+
+MySQL 体系结构图
+![](/assets/images/mysql/MySQL-architech.png)
+
+MySQL由一下几部分组成：
+* 连接池组件
+* 管理服务和工具组件
+* SQL接口组件
+* 查询分析器组件
+* 优化器组件
+* 缓冲（Cache）组件
+* 插件式存储引擎
+* 物理文件
+
+MySQL是基于插件式的表存储引擎。存储引擎是基于表的，而不是数据库。
+
+## MySQL存储引擎
+MySQL数据库的核心在于存储引擎；用户可以根据MySQL预定义的存储引擎接口编写自己的存储引擎。
+
+### InnoDB存储引擎
+支持事务，设计目标主要面向在线事务处理（OLTP）的应用。其特点是行锁设计、支持外键，并支持类似于Oracle的非锁定读，即默认读取操作不会产生锁。MySQL 5.5.8 之后 InnoDB为默认的存储引擎。
+
+InnoDB存储引擎将数据放在一个逻辑的表空间中；SQL标准的REPEATABLE隔离级别；还提供了插入缓冲
+（insert buffer）、二次写（double write）、自适应哈希索引（adaptive hashindex）、预读（read ahead）
+等功能。
+
+InnoDB存储引擎采用了聚集的方式存储表中的数据，每张表的存储都是按主键的顺序进行存放。如果没有
+显示地指定主键，默认会为每一行生成一个6字节的ROWID，并以此作为主键。
+
+### MyISAM存储引擎
+不支持事务、表锁设计、支持全文索引，主要面向一些OLAP数据库应用。MySQL 5.5.8 之前 MyISAM为默认的存储引擎。
+MyISAM存储引擎的缓冲池只缓存（cache）索引文件，而不缓冲数据文件。
+
+MyISAM存储引擎表由MYD和MYI组成，MYD用来存放数据文件，MYI用来存放索引文件。可以使用myisampack工具
+压缩数据文件，该工具使用Huffman编码静态算法来压缩数据，因此压缩的表是只读的。
+
+MySQL各存储引擎对比图
+![](/assets/images/mysql/MySQL-StorageEngine.png)
+
+## 连接MySQL
+连接MySQL操作是一个连接进程和MySQL数据库实例进行通信。本质上是进程通信。常用的进程通信方式有
+管道、命名管道、命名字、TCP/IP套接字、UNIX域套接字。
+
+TCP/IP `mysql -h127.0.0.1 -u root -p`
+ 
+# 2. InnoDB存储引擎
+
+InnoDB存储引擎体系架构图
+![](/assets/images/mysql/InnoDB-Architect.png)
+	
+InnoDB存储引擎有多个内存块，组成一个大的内存池：
+* 维护所有进程/线程需要访问的多个内部数据结构；
+* 缓存磁盘上的数据，方便快速地读取，同时在对磁盘文件的数据修改前在这里缓存；
+* 重做日志（redo log）缓冲；
+
+后台线程主要负责刷新内存池中的数据，保证内存中缓存的数据是最近的，以及将已修改的数据文件
+刷新到磁盘文件，保证在数据库发生异常的情况下InnoDB能恢复到正常运行状态。
+
+## 后台线程
+InnoDB存储引擎是多线程模型，后台有多个不同的线程负责处理不同的任务。
+1. Master Thread
+负责将缓冲池中的数据异步刷新到磁盘，保证数据的一致性，包括脏页的刷新、合并插入缓冲（INSERT BUFFER）、UNDO页
+的回收等。
+2. IO Thread
+在InnoDB存储引擎中大量使用了AIO（Async IO）来处理写IO请求。IO Thread的工作主要是负责这些IO请求的回调（call back）
+处理。有4个IO Thread，分别是write、read、insert buffer和log IO Thread。
+3. Purge Thread
+事务被提交后，undolog可能不再需要，因此需要Purge Thread来回收已经使用并分配的undo页。
+
+## 内存
+1. 缓冲池
+InnoDB存储引擎是基于磁盘存储的，并将其中的记录按照页的方式进行管理。在数据库中进行读取页的操作，首先将从磁盘读到的
+页存放在缓冲池中，这个过程称为页“FIX”在缓冲池中。下一次再读相同的页时，首先判断该页是否在缓冲池中。若在则称该页被命中，
+直接读取该页。否则，读取磁盘上的页。对于页的修改，首先修改缓冲池中的页，然后再以一定的频率（Checkpoint机制）刷新到磁盘上。
+
+缓冲池中缓冲的数据页类型有：索引页、数据页、undo页、插入缓冲（insert buffer）、自适应哈希索引（adaptive hash index）
+、InnoDB存储的锁信息（lock info）、数据字典信息（data dictionary）等。
+
+InnoDB内存数据对象图
+![](/assets/images/mysql/BufferPool-Architect.png)
+
+允许有多个缓冲池实例。每个页根据哈希值平均分配到不同的缓存池。
+
+2. LRU List、Free List和Flush List
+数据库中的缓冲池是通过LRU算法来进行管理的。即最频繁使用的页在LRU列表的前端，
+而最少使用的页在LRU列表的尾端。当缓冲池不能存放新读取到的页时，将首先释放LRU列表中
+尾端的页。
+
+在InnoDB存储引擎中，缓冲池中页的大小默认为16KB，并对LRU算法做了一些优化，在LRU列表中加入了midpoint位置。新
+读取到的页，并不直接放入LRU列表的首部，而是放入到LRU列表的midpoint位置。把midpoint之后的列表称为old列表，之
+前的列表称为new列表。new列表中的页都是最为活跃的热点数据。
+
 # 4. 表
 
 ## 4.1 索引组织表

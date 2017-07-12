@@ -1,15 +1,51 @@
 ---
 layout: post
-title: How Tomcat Works
-category: ReadingNotes
-description: How Tomcat Works A Guide to Developing Your Own Java Servlet Container 读书笔记
+title: Tomcat8
+category: SearchingNotes
+description: Tomcat8 source SearchingNotes.
 ---
 
-# How Tomcat Works
+# Tomcat8
 
-# 4. Connector
+# 1. ClassLoader
 
-## 4.1 Connector
+`org.apache.catalina.startup.Bootstrap`启动类，main方法启动tomcat，首先调用init方法处理
+化类加载器。这里先启动类加载器`initClassLoaders`。先创建`common classLoader`，再创建
+`server classLoader`和`shared classLoader`。`commonLoader`为`serverLoader`和`sharedLoader`的父类。通过`ClassLoaderFactory.createClassLoader`
+创建classLoader，`UrlClassLoader`。（Tomcat为什么需要使用`AccessController.doPrivileged`
+来创建`UrlClassLoader`？）
+
+类加载器创建完成后，将`serverLoader`设置为当前线程的的上下文类加载器。
+`serverLoader`加载器通过反射方式创建`org.apache.catalina.startup.Catalina`启动类。再通过反射的方式将`Catalina`启动类的父加载容器设置为`java.lang.ClassLoader`。
+（所以在启动的时候，做了什么？ClassLoader之间的关系是怎么样的？
+
+类加载器关系图
+classloader->commonLoader->serverLoader
+					     ->sharedLoader
+		   ->catalinaLoader
+
+）
+
+初始化完成后，`Bootstrap`调用`Catalina`启动类的`start`方法完成启动工作。到这里
+`Bootstrap.main`方法到此结束。之后的工作都交给了`Catalina.start`方法。
+
+`Catalina`定义了一个内部类`CatalinaShutdownHook`监听关闭事件，当服务被kill时，将调用
+`Catalina.this.stop()`方法安全停止服务。现在来看`Catalina.start`方法做了什么？
+
+首先创建Digester，启动`org.apache.catalina.core.StandardServer`服务，加载`conf/server.xml`配置文件，解析配置。
+
+StandardServer 类图
+![](/assets/images/how-tomcat-works/StandardServer.png)
+
+Server->Services
+      ->Services
+	
+
+## 1.1 Catalina
+
+# 2. Connector
+
+## 2.1 Connector
 
 Connector 类图
 ![](/assets/images/how-tomcat-works/Connector.png)
@@ -52,4 +88,40 @@ Processor一行行的解析。解析完成后将生成的Request和Response交�
 InputBuffer 类图
 ![](/assets/images/how-tomcat-works/InputBuffer.png)
 
-## 4.2 Container
+# 3. Container
+
+Container 类图
+![](/assets/images/how-tomcat-works/Container.png)
+
+ContainerBase基类实现了Container接口，并持有一个管道Pipeline。管道连接着多个容器。Engine、Host、Context、Wrapper都是容器的实现类。管道会顺序的调用所有容器，管道内的容器需要实现invoke方法。
+
+Value 类图
+![](/assets/images/how-tomcat-works/Value.png)
+
+每个容器都管理着对应的Value，容器实例化的时候创建一个新的Value添加到管道中。管道调用Value的invoke方法。
+
+StandardWrapperValue的invoke方法，获取StandardWrapper容器，然后通过getParent方法获取Wrapper的父容器Context。检查Context和Wrapper是否可用，如果可用，Wrapper将通过allocate方法实例化一个Servlet来处理请求。
+
+StandardWrapper的loadServlet方法完成servlet实例化工作，该方法是一个synchronized方法
+{% highlight java %}
+public synchronized Servlet loadServlet() throws ServletException {
+	
+	...
+
+	InstanceManager instanceManager = ((StandardContext)getParent()).getInstanceManager();
+
+	servlet = (Servlet)instanceManager.newInstace(servletClass);
+
+	...
+
+	return servlet;
+}
+{% endhighlight %}
+
+Servlet实例化完成后，Wrapper为请求创建一个过滤链ApplicationFilterChain。过滤链会依次调用链上的所有Filter。当链上所有的Filter都处理完成后，最后会调用servlet的service方法。（Servlet是从哪里来？）
+
+ApplicationFilterChain 类图
+![](/assets/images/how-tomcat-works/ApplicationFilterChain.png)
+
+# 4 jasper
+`org.apache.jasper.servlet.JspServlet` The JSP engine.
