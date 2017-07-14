@@ -107,6 +107,74 @@ InnoDB内存数据对象图
 读取到的页，并不直接放入LRU列表的首部，而是放入到LRU列表的midpoint位置。把midpoint之后的列表称为old列表，之
 前的列表称为new列表。new列表中的页都是最为活跃的热点数据。
 
+3.重做日志缓冲
+redo log buffer
+* Master Thread每一秒将重做日志缓冲刷新到重做日志文件
+* 每个事务提交时会重做日志缓冲刷新到重做日志文件
+* 当重做日志缓冲池剩余空间小于1/2时，重做日志缓冲刷新到重做日志文件。
+
+4.额外的内存池
+
+## Checkpoint技术
+缓冲池的设计目的是为了协调CPU速度与磁盘速度的鸿沟。因此页的操作首先都是在缓冲中完成的。如果一条DML语句改变了页中的记录，该页称为脏页，即缓冲池中的页的版本要比磁盘的新。在缓冲池将页的新版本刷新到磁盘时如果发送宕机，那么数据就不能恢复了。因此当前事务数据库系统都采用了Write Ahread Log策略，即当事务提交时，先写重做日志，再修改页。当发生宕机而导致数据丢失时，通过重做日志来完成数据恢复。事务ACID中D（Durability持久性）的要求。
+
+Checkpoint（检查点）技术的目的是解决以下几个问题：
+* 缩短数据库的恢复时间；
+* 缓冲池不够用时，将脏页刷新到磁盘；
+* 重做日志不可用时，刷新脏页。
+
+在InnoDB存储引擎内部，有两种Checkpoint，分别为：
+1）Sharp Checkpoint：发生在数据库关闭时将所有脏页都刷新回磁盘；
+2）Fuzzy Checkpoint：在数据库运行时进行页的刷新，每次只刷新一部分脏页。
+Fuzzy Checkpoint 发生情况：
+* Master Thread Checkpoint：异步操作，用户查询线程不会阻塞。
+* FLUSH_LRU_LIST Checkpoint：检查操作放在一个单独的Page Cleaner线程中进行。
+* Async/Sync Flush Checkpoint：重做日志文件不可用情况，强制将页刷新回磁盘；该操作同样放到了一个单独的Page Cleaner Thread中，故不会阻塞用户查询线程。
+* Dirty Page too much Checkpoint：脏页数量太多，强制进行Checkpoint。
+
+## Master Thread 工作方式
+Master Thread具有最高的线程优先级别。其内部由多个循环（loop）组成：主循环（loop）、后台循环（backgroup loop）、刷新循环（flush loop）、暂停循环（suspend loop）。Master Thread会根据数据库运行状态在这些循环中进行切换。
+
+Loop主循环，有两大部分操作：每秒钟的操作和每10秒的操作。
+loop循环通过thread sleep来实现，在负载很大的情况下可能会有延迟（delay）。
+
+每秒一次的操作包括：
+* 日志缓冲刷新到磁盘，即使这个事务还没有提交（总是）；
+* 合并插入缓冲（可能）；
+* 至多刷新100个InnoDB的缓冲池中的脏页到磁盘（可能）；
+* 如果当前没有用户活动，则切换到background loop（可能）；
+
+每10秒的操作包括：
+* 刷新100个脏页到磁盘（可能的情况下）；
+* 合并至多5个插入缓冲（总是）；
+* 删除无用的Undo页（总是）；
+* 刷新100个或者10个脏页到磁盘（总是）。
+
+若当前没有用户活动（数据库空闲时）或者数据库关闭（shutdown），就会切换到backgroup loop。background loop会执行以下操作：
+* 删除无用的Undo页（总是）；
+* 合并20个插入缓冲（总是）；
+* 跳回到主循环（总是）；
+* 不断刷新100个页直到符合条件（可能，跳转到flush loop中完成）。
+
+若flush loop中也没有什么事情可以做，就会切换到suspend_loop，将Master Thread挂起，等待事件的发生。
+
+## InnoDB关键特性
+
+### 插入缓冲（Insert buffer）
+1.Insert Buffer
+2.Change Buffer
+3.Insert Buffer的内部实现
+4.Merge Insert Buffer
+
+### 两次写（Double Write）
+
+### 自适应哈希索引（Adaptive Hash Index）
+
+### 异步IO（Async IO）
+
+### 刷新邻接页（Flush Neighbor Page）
+
+
 # 4. 表
 
 ## 4.1 索引组织表
