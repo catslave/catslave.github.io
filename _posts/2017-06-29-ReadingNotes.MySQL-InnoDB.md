@@ -162,8 +162,22 @@ loop循环通过thread sleep来实现，在负载很大的情况下可能会有�
 
 ### 插入缓冲（Insert buffer）
 1.Insert Buffer
+在InnoDB存储引擎中，主键是行唯一的标识符。通常应用程序中行记录的插入顺序是按照主键递增的顺序进行插入的。因此，插入聚集索引（Primary Key）一般是顺序的，不需要磁盘的随机读取。
+
+对于一张表上有多个非聚集的辅助索引（secondary index），在进行插入操作时，非聚集索引叶子节点的插入不再是顺序的了，这时就需要离散地访问非聚集索引页，由于随机读取的存在而导致了插入操作性能下降。
+
+InnoDB存储引擎，对于非聚集索引的插入或更新操作，不是每一次直接插入到索引页中，而是先判断插入的非聚集索引页是否在缓冲池中，若在，则直接插入；若不在，则先放入到一个Insert Buffer对象中。（这里看不是很懂，以后再来看一遍！）
+
 2.Change Buffer
+Insert Buffer、Delete Buffer、Purge Buffer。Change Buffer适用的对象依然是非唯一的辅助索引。对一条记录的UPDATE操作可能分为两个过程：
+* 将记录标记为已删除
+* 真正将记录删除。
+
 3.Insert Buffer的内部实现
+Insert Buffer的使用场景，即非唯一辅助索引的插入操作。其内部数据结构是一颗B+树。全局只有一颗Insert Buffer B+树，负责对所有的表的辅助索引进行Insert Buffer。而这颗B+树存放在共享空间中，默认也就是ibdata1中。
+
+B+树非页节点存放的是查询的search key（键值 space|marker|offset）。space表示待插入记录所在表的表空间id，offset表示页所在的偏移量。当一个辅助索引要插入到页（space, offset）时，如果这个页不在缓冲池中，InnoDB首先构造一个search key，接下来查询Insert Buffer这颗B+树，然后再将这条记录插入到树的叶子节点中。
+
 4.Merge Insert Buffer
 
 ### 两次写（Double Write）
