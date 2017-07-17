@@ -182,12 +182,32 @@ B+树非页节点存放的是查询的search key（键值 space|marker|offset）
 
 ### 两次写（Double Write）
 
+InnoDB存储引擎doublewrite架构
+![](/assets/images/mysql/doublewrite.png)
+
+doublewrite由两部分组成，一部分是内存中的doublewrite buffer，大小为2MB，另一部分是物理磁盘上共享表空间中连续的128个页，即2个区（extent），大小同样为2MB。在对缓冲池的脏页进行刷新时，并不直接写磁盘，而是全通过memcpy函数将脏页先复制到内存中的doublewrite buffer，之后通过doublewrite buffer再分两次，每次1MB顺序地写入共享表空间的物理磁盘上，然后马上调用fsync函数，同步磁盘，避免缓冲写带来的问题。在这个过程中，因为doublewrite页是连续的，因此这个过程是顺序写的，开销并不是很大。在完成doublewrite页的写入后，再将doublewrite buffer中的页写入各个表空间文件中，此时的写入则是离散的。
+
+如果操作系统在将页写入磁盘的过程中发送了崩溃，在恢复过程中，InnoDB存储引擎可以从共享表空间中的doublewrite中找到该页的一个副本，将其复制到表空间文件，再应用重做日志。
+
 ### 自适应哈希索引（Adaptive Hash Index）
+哈希是一种非常快的查找方法，一般情况下查找时间复杂度为O(1)，而B+树的查找次数，取决于B+树的高度，在生成环境中，B+树的高度一般为3~4层，故需要3~4次的查询。
+
+InnoDB存储引擎会监控对表上各索引页的查询，可以建立索引提高速度就会创建哈希索引，称为自适应哈希索引（Adaptive Hash Index，AHI）。AHI是通过缓冲池的B+树页构造而来，因此建立的速度很快，而且不需要对整张表构建哈希索引。InnoDB存储引擎会自动根据访问的频率和模式来自动地为某些热点页建立哈希索引。
 
 ### 异步IO（Async IO）
 
-### 刷新邻接页（Flush Neighbor Page）
 
+### 刷新邻接页（Flush Neighbor Page）
+当刷新一个脏页时，InnoDB存储引擎会检测该页所在区（extent）的所有页，如果是脏页，那么一起进行刷新。通过AIO可以将多个IO写入操作合并为一个IO操作。
+对于传统机械硬盘建议开启该特性，而对于固态硬盘有着超高IOPS性能的磁盘，则建议关闭此特性。
+
+# 3. 文件
+参数文件
+日志文件
+socket文件
+pid文件
+MySQL表结构文件
+存储引擎文件
 
 # 4. 表
 
