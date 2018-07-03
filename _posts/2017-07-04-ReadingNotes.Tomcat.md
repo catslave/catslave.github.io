@@ -9,6 +9,10 @@ description: Tomcat8 source SearchingNotes.
 
 # 1. ClassLoader
 
+`Bootstrap`创建一些列class loads，并创建和启动Catalina实例。
+
+（tomcat为什么要自定义classLoader？1.实现servlet规范中对类加载的要求；2.实现不同webapp的类隔离）
+
 `org.apache.catalina.startup.Bootstrap`启动类，main方法启动tomcat，首先调用init方法处理
 化类加载器。这里先启动类加载器`initClassLoaders`。先创建`common classLoader`，再创建
 `server classLoader`和`shared classLoader`。`commonLoader`为`serverLoader`和`sharedLoader`的父类。通过`ClassLoaderFactory.createClassLoader`
@@ -43,6 +47,27 @@ Server->Services
 
 ## 1.1 Catalina
 
+Catalina的服务默认是StandardServer。在createStartDigester方法解析conf/server.xml 配置文件，并配置了默认的服务实现类`org.apache.catalina.core.StandardServer`
+
+启动服务
+
+## 1.2 Server
+
+StandardServer可以管理多个Service，使用数组来存储Service。
+
+addService方法里面每次有新的service，创建新的Service数组，然后使用System.arraycopy将旧的Service数组复制到新的数组中，并将新添加的Service添加到新的数组。添加成功后启动该新的Service。
+
+removeService方法将service从数组中删除，并停止该Service。
+
+initInternal方法处理化所有的Service
+
+startInternal方法启动所有的Service
+
+stopInternal方法停止所有的Service
+
+destroyInternal方法销毁所有的Service
+
+
 # 2. Connector
 
 ## 2.1 Connector
@@ -50,9 +75,13 @@ Server->Services
 Connector 类图
 ![](/assets/images/how-tomcat-works/Connector.png)
 
-在构造方法中设置连接协议，会判断是否启用了Apr协议。如果启用了Apr协议，则使用"Http11AprProtocol"协议；否则使用"Http11NioProtocl"协议。
+（一句话概括Connector的功能--2018/03/02）
+
+在构造方法中设置连接协议，（tomcat8配置文件server.xml默认协议是HTTP/1.1）会判断是否启用了Apr协议。如果启用了Apr协议，则使用"Http11AprProtocol"协议；否则使用"Http11NioProtocl"协议（默认协议）。
 初始化的时候创建adapter和handler。
 启动调用endpoint的start方法。
+
+Connector创建一个Adapter（CoyoteAdapter）和ProtocolHandler（Http11NioProtocol）。Http11NioProtocol创建NioEndpoint（NioEndpoint是Connector中处理客户端连接的核心类，负责创建服务器套接字，并绑定到监听端口；同时还创建accepter线程来接收客户端的连接以及poller线程来处理连接中的读写请求）。
 
 Protocol 类图
 ![](/assets/images/how-tomcat-works/Protocol.png)
@@ -87,6 +116,12 @@ Processor一行行的解析。解析完成后将生成的Request和Response交�
 
 InputBuffer 类图
 ![](/assets/images/how-tomcat-works/InputBuffer.png)
+
+## 2.1 Service
+
+Service关联着一组Connector。
+
+addConnector方法采用跟addService方法类似，使用数组管理Connector，将旧的Connector数组复制到新的数组，并将新添加的Connector添加至数组中。然后启动Connector。（其实Server和Service都只是一个封装，并没有做任何事情。主要是Connector和Container两个组件，）
 
 # 3. Container
 
