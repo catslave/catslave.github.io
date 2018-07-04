@@ -24,9 +24,12 @@ ColumnFamilyStore switchMemtable方法将刷盘动作提交flush到flushExecutor
 
 `RowIndexEntry`索引文件
 
+## ColumnFamilyStore.Flush
+该任务类用于交换memtable，将已满的memtable置为非活跃只读状态同时创建一个新的活跃memtable用于数据写入。
+
 
 # Memtable
-数据先写入memtable再写入文件，现在已经分析了数据如何写入memtable和数据如何写入文件，现在要分析数据何时从memtable写入文件，这是一个关键的节点也许很简单也许要再找找。好像是有`Tracker`Memtable的生命周期管理类来进行标识是否可刷盘。
+数据先写入memtable再写入文件，现在已经分析了数据如何写入memtable和数据如何写入文件，现在要分析数据何时从memtable写入文件，这是一个关键的节点也许很简单也许要再找找。好像是有`Tracker`Memtable的生命周期管理类来进行标识是否可刷盘。`ColumnFamilyStore.Flush`构造函数创建新的memtable并调用`Tracker.switchMemtable`。明天研究下文件写入的格式！
 
 ## PartitionPosition
 ' private final ConcurrentNavigableMap<PartitionPosition, AtomicBTreePartition> partitions = new ConcurrentSkipListMap<>();'通过PartitionPosition来索引memtable，可以实现范围查询。
@@ -47,7 +50,7 @@ put方法的流程：根据数据的key获取该key在memtable中的partitionPos
 Memtable的生命周期管理类来进行标识是否可刷盘，方法switchMemtable调用view.switchMemtable方法将活跃的memtable标识为只读，同时创建新的活跃memtable。
 
 ## View
-将活跃的memtable标识为immutable，同时创建新的活跃memtable。
+`lifecycle\View`将活跃的memtable标识为immutable，同时创建新的活跃memtable。
 
 
 
