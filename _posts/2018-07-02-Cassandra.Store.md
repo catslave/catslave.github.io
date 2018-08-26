@@ -22,14 +22,14 @@ ColumnFamilyStore switchMemtable方法将刷盘动作提交flush到flushExecutor
 
 `BigTableWriter.append()`方法实际写入一行记录：当memtable刷盘时，会把内存中有序的数据追加到BigTableWriter。`append()`方法首先获取文件的当前位置`startPosition = dataFile.position()`，然后调用`columnIndex.buildRowIndex()`方法写入数据文件，最后调用`indexWriter.append()`写入索引文件。`columnIndex.buildRowIndex()`方法首先`writePartitionHeader()`写头部信息，然后`add()`写入数据文件，最后`finish()`写入结束符。`columnIndex.add()`方法首先获取文件的当前位置`currentPosition()`，然后调用`UnfilteredSerializer.serializer.serialize()`方法，最终由该方法调用`sequentialWriter`写入数据。（Cassandra源码分析-存储引擎：http://zqhxuyuan.github.io/2016/10/19/Cassandra-Code-StorageEngine/#BigTableWriter）
 
-`RowIndexEntry`索引文件
+`BigTableWriter.append()`方法，将数据写入文件后，再将数据在文件中的位置写入索引文件。
 
 ## ColumnFamilyStore.Flush
 该任务类用于交换memtable，将已满的memtable置为非活跃只读状态同时创建一个新的活跃memtable用于数据写入。
 
 
 # Memtable
-数据先写入memtable再写入文件，现在已经分析了数据如何写入memtable和数据如何写入文件，现在要分析数据何时从memtable写入文件，这是一个关键的节点也许很简单也许要再找找。好像是有`Tracker`Memtable的生命周期管理类来进行标识是否可刷盘。`ColumnFamilyStore.Flush`构造函数创建新的memtable并调用`Tracker.switchMemtable`。明天研究下文件写入的格式！
+数据先写入memtable再写入文件，现在已经分析了数据如何写入memtable和数据如何写入文件，现在要分析数据何时从memtable写入文件，这是一个关键的节点也许很简单也许要再找找。好像是有`Tracker`Memtable的生命周期管理类来进行标识是否可刷盘。`ColumnFamilyStore.Flush`构造函数创建新的memtable并调用`Tracker.switchMemtable`。明天研究下文件写入的格式！数据的格式是什么样的，如何记录索引。
 
 ## PartitionPosition
 ' private final ConcurrentNavigableMap<PartitionPosition, AtomicBTreePartition> partitions = new ConcurrentSkipListMap<>();'通过PartitionPosition来索引memtable，可以实现范围查询。
@@ -52,6 +52,10 @@ Memtable的生命周期管理类来进行标识是否可刷盘，方法switchMem
 ## View
 `lifecycle\View`将活跃的memtable标识为immutable，同时创建新的活跃memtable。
 
+# rows
+因为写入的数据大小是不确定过的，所以这里序列化的时候不能指定写入的大小，所以要记录所有数据的位置，这就需要索引文件。
+
+## UnfilteredSerializer
 
 
 # SSTable
@@ -64,3 +68,8 @@ SSTable在磁盘的数据存储是有序的，分为数据文件和索引文件�
 `DataOutput->DataOutputPlus->DataOutputStreamPlus->BufferedDataOutputStreamPlus->SequentialWriter`，DataOutput接口定义了将Java数据类型转换为字节写入到二进制流方法。接口DataOutputPlus继承了DataOutput，同时扩展了将ByteBuffer和Memory转换为字节写入流方法。抽象类DataOutputStreamPlus实现了DataOutputPlus接口同时继承了OutputStream抽象类，即提供了ByteBuffer和Memory的数据写入同时也提供了数据流的输出。实现类BufferedDataOutputStreamPlus继承DataOutputStreamPlus实现了部分接口，比如write(byte[] b)方法：将字节写入ByteBuffer。该类是线程不安全的。SequentialWriter类继承了BufferedDataOutputStreamPlus同时实现了Transactional事务管理接口。
 
 `SequentialWriter`在实例化时调用父类构造函数初始化ByteBuffer（`ByteBuffer.allocate()`默认64K：64 * 1024，堆内内存，默认容量大小10M，超过10M就刷盘，这些数据定义在SequentialWriterOption里面），定义了openChannel打开文件方法，sync刷盘方法将byteBuffer写入文件并强制force刷盘。目前有三处会调用SequentialWriter.sync方法，BufferedDataOutputStreamPlus的所有写入方法在写完数据后都会刷盘！ BigTableWriter的openFinalEarly方法：indexFile.sync()和dataFile.sync()，打开文件之前会确认byteBuffer的数据都已刷盘。OnDiskIndexBuilder的finish方法：out.sync()。
+
+## SSTableReader
+`BigTableReader->SSTableReader`，SSTableReader.getPosition->BigTableReader.getPosition。首先从缓存从获取key的位置getCachedPosition，如果找到就直接返回，没有找到就继续。读取indexfile，获取数据在datafile中的位置。第一个int为position，第二个int为数据size。如果size=0则直接new RowIndexEntry返回；不为0，继续读取下一个int获取headerLength，columnsIndexCount。总size-headerLength-columnsIndexLength得数据的indexedPartSize。
+
+首先获取key，如果key不相等，会继续循环查找下一个`RowIndexEntry.Serializer.skip`跳过这些数据到下一个位置`in.skipBytesFully(size)->InputStream.skip(n)`，数据在indexfile中存储的格式`key|position|size|data`。
