@@ -77,3 +77,22 @@ pathname 为FIFO的名字，FIFO也是半双工的。对管道和FIFO的write总
 
 如果当前尚没有任何进程打开某个FIFO来写，那么打开该FIFO来读的进程将阻塞。父子进程都打开同一个FIFO来读，然而此时并没有任何进程打开该文件来写，于是父子进程都阻塞，出现死锁（deadlock）。
 
+# JNI
+
+native源码路径openjdk/jdk/src/share/native/java/net/net_util.h
+
+native方法
+JNIEXPORT void JNICALL Java_java_net_Inet4Address_init(JNIEnv *env, jclass cls);
+
+对应Java的native方法
+java/net/Inet4Address.java
+
+private static native void init();
+
+Java_表示前缀
+java_net_Inet4Addrss_表示类名 -> java/net/Inet4Address
+init表示方法 -> Inet4Address.init()
+void -> 表示返回值 Inet4Address.init():void
+
+
+
