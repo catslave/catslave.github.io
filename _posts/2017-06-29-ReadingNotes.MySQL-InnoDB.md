@@ -19,7 +19,7 @@ mysql --help | grep my.cnf 查找配置文件）。如果有多个配置文件�
 MySQL 体系结构图
 ![](/assets/images/mysql/MySQL-architech.png)
 
-MySQL由一下几部分组成：
+MySQL由以下几部分组成：
 * 连接池组件
 * 管理服务和工具组件
 * SQL接口组件
