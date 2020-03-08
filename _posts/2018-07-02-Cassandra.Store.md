@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Cassandra In Action - Store
-category: Cassandra
+category: Cassandra,Database
 description: 梳理Cassandra的写过程。特别是Memtable的flush过程。
 ---
 

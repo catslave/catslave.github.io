@@ -1,7 +1,7 @@
 ---
 layout: post
 title: MySQL-InnoDb
-category: ReadingNotes
+category: ReadingNotes,MySQL,Database
 description: MySQL技术内幕InnoDB存储引擎 读书笔记
 ---
 
