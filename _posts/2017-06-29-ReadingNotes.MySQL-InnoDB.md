@@ -1,6 +1,6 @@
 ---
 layout: post
-title: MySQL-InnoDb
+title: MySQL-InnoDB
 category: MySQL
 description: MySQL技术内幕InnoDB存储引擎 读书笔记
 ---
