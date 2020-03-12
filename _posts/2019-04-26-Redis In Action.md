@@ -142,6 +142,8 @@ Redis单个实例必须要以cluster集群身份启动才能作为集群节点�
 
 **push**
 
+**slaveof**
+
 **设置key的过期时间**
 
 expire/pexpire
@@ -179,3 +181,256 @@ AOF：
 - 被设置了过期的键中，LRU最近最少使用淘汰
 - 被设置了过期的键中，Radom随机淘汰
 - 被设置了过期的键中，TTL存活时间最短的淘汰
+
+## 持久化策略
+
+Redis提供两种持久化方式：RDB和AOF。Redis允许两者结合一起使用。
+RDB：可以定时备份内存中的数据集。服务器启动的时候，可以从RDB文件中恢复数据集。
+AOF：记录服务器的所有写操作。服务器启动的时候，会把所有写操作重新执行一遍，从而实现数据备份。
+
+默认使用RDB方式。
+
+### RDB
+
+RDB可以手动执行，也可以根据配置文件选择定期执行。RDB方式生成的文件是一个经过压缩的二进制文件，通过该文件可以还原当时数据库的状态。
+
+#### 何时触发
+
+可以手动或者自动触发
+
+手动触发：执行`SAVE`或则`BGSAVE`命令。
+
+自动触发：根据配置文件里的`save`参数条件，自动触发`BGSAVE`命令。
+
+
+#### RDB文件生成
+
+两个Redis命令生成RDB文件：
+* SAVE 由当前进程执行，会阻塞Redis服务器进程，直到RDB文件创建完毕为止。阻塞期间，服务器不能处理任何命令请求。
+* BGSAVE 由后台执行，会fork派生一个子进程，由子进程执行负责创建RDB文件，服务器进程继续处理命令请求。
+
+实际创建RDB文件都是由rdb.c/rdbSave函数完成
+
+rdb.c/rdbSave函数写文件，rdb.c/rdbLoad函数重载文件。持久化的文件是一份压缩的二进制文件。
+
+#### RDB文件载入
+
+RDB的载入工作，是在服务器启动的时候自动执行的，所以没有专门命令用于载入RDB文件。Redis启动时检测到RDB文件的存在，就会自动载入RDB文件。
+
+因为AOF文件的更新频率高于RDB文件，所以服务器启动时会优先使用AOF文件来还原数据。只有在AOF持久化功能关闭的状态才会使用RDB文件来还原。
+
+{% highlight java %}
+struct redisServer {
+    long long dirty; // 计数器，记录距离上次dump后，服务器对数据库状态的操作次数 64位（long 32位）
+    time_t lastsave; // 上次dump的时间
+};
+{% endhighlight %}
+
+serverCron 定时函数，定期执行任务。
+
+RDB文件结构
+REDIS|db_version|databases|EOF|check_sum
+
+databases数据结构
+SELECTDB|db_number|key_value_pairs
+
+key_value_pairs数据结构
+TYPE|key|value 不带过期时间的键值对
+EXPIRETIME_MS|ms|TYPE|key|value 带过期时间的键值对
+
+value数据结构
+ENCODING|integer
+len|string
+list_length|item1|item2|...|itemN
+set_size|elem1|elem2|...|elemN
+hash_size|key_value_pair1|key_value_pair2|...|key_value_pairN -> key1|value1|key2|value2|...|keyN|valueN
+
+#### 保存频率
+
+持久化频率条件：
+- save 900 1，900秒内对数据库进行至少一次修改
+- save 300 10
+- save 60 10000
+
+满足以上条件，Redis会自动执行SAVE或BASAVE命令。
+> Redis默认是阻塞同步，即SAVE命令模式执行。
+
+#### 优势和劣势
+
+优势：
+1. 在恢复大数据集时的速度，RDB比AOF快；
+
+劣势：
+1. RDB不是实时，可能存在部分数据丢失问题。
+
+参考链接：https://www.cnblogs.com/ysocean/p/9114268.html
+
+### AOF
+AOF(append only file)是记录了数据的变更，RDB是保存了数据本身。持久化的文件是一份文本文件。
+> AOF保存所有的写命令。
+W
+rewriteAppendOnlyFile()函数写文件，loadAppendOnlyFile()函数重载文件。
+
+{% highlight java %}
+struct redisServer {
+    sds aof_buf; // AOF缓冲区
+};
+{% endhighlight %}
+
+#### AOF文件生成
+
+**AOF持久化三步骤**
+
+AOF持久化功能的实现可以分为**命令追加（append）**、**文件写入**、**文件同步（sync）**三个步骤。
+* 命令追加（append）：服务器执行完一条写命令后，会以协议格式将命令追加到aof_buf缓冲区的末尾。
+* 文件的写入与同步：执行完写命令后，会调用flushAppendOnlyFile函数检查aof_buf缓冲区是否可以写入AOF文件。
+> appendfsync选项：
+> * always，每个事件循环都将aof_buf缓冲区**写入AOF文件，并且同步AOF文件**。效率最**慢**，安全最**高**。
+> * everysec，每个事件循环都将aof_buf缓冲区**写入AOF文件**，并且每隔一秒在子线程中对AOF文件进行一次**同步**。效率较**高**，丢失一秒数据。
+> * no，每个事件循环都将aof_buf缓冲区**写入AOF文件**，然后由操作系统决定什么时候同步文件。效率**最快**，丢失上一次同步数据。
+
+AOF文件的载入与数据还原：
+1）创建一个伪客户端（fake client）；
+2）从AOF文件分析并读取出一条写命令；
+3）使用伪客户端执行写命令；
+4）一直循环2，3步骤，知道AOF文件所有写命令被处理完毕；
+5）载入完毕。
+
+#### AOF文件载入
+
+因为AOF文件里面包含了数据库的所有写命令，所以Redis只要重新执行一遍AOF文件里的所有命令即可将数据库还原。
+> Redis启动一个伪客户端，载入AOF文件，然后将命令发送服务端执行。
+
+#### AOF文件过大问题
+
+**AOF重写**
+
+AOF持久化会记录所有的写命令，随着运行时间的流逝，AOF文件内存会越来越多大。为了解决AOF文件体积膨胀问题，Redis提供了AOF文件重写（rewrite）功能。通过创建一个新的AOF文件替代现有AOF文件，新旧两个AOF文件所保存数据库状态相同，但新AOF文件不包含冗余命令。
+> AOF重写实际就是只记录数据的最终状态。一条数据，中间往往会被修改多次，AOF不需要把每一条操作命令都记录执行，只要把最终的那条数据状态生成一条写命令即可。这样就可以节省非常多的命令和执行时间。
+> **重写是采用新的子进程执行**。
+
+
+AOF重写的好处：
+- 压缩AOF文件，减少磁盘占用量；
+- 将AOF的命令压缩到最小集，加快数据恢复速度。
+
+
+**重写原理**：并不是去一条条解析旧AOF文件的所有写命令，而是去比对当前数据库状态来实现的。首先从数据库中读取键现在的值，然后用一条命令去记录键值对，代替之前记录这个键值对的多条命令，这就是AOF重写功能的实现原理。
+> AOF重写不会对现有的AOF文件进行任何读取、分析操作，而是直接读取服务器当前状态实现的。
+
+因为aof_rewrite函数生成的新AOF文件只包含还原当前数据库状态所必须的命令，所以新AOF文件不会浪费任何硬盘空间。
+
+**何时重写**
+
+> 当AOF文件大于64M（auto-aof-rewrite-min-size配置大小）触发重写
+
+AOF重写可以手动触发和自动触发。
+
+手动触发：执行`BGREWRITEAOF`命令。
+
+自动触发：
+
+Redis在AOF功能开启情况下，会维护三个变量：
+- 当前AOF文件大小`aof_current_size`
+- 上一次AOF重写后的文件大小`aof_rewrite_base_size`
+- 增长百分比`aof_rewrite_perc`
+
+Redis会定期检查以下条件是否满足，如果全部满足就会自动触发重写：
+1. 没有RDB或AOF在执行
+2. 没有`BGREWRITEAOF`重写在执行
+3. 当前AOF文件大小大于`auto-aof-rewrite-min-size`(默认64mb)
+4. 当前AOF文件大小和最后一次的大小之间比率大于`auto-aof-rewrite-percentage`值
+
+**如何重写**
+
+因为重写需要耗费大量时间，所以Redis使用后台进程（子进程）来执行重写操作。
+> - 子进程重写期间，主进程可以继续处理命令请求；
+> - 使用子进程而不是线程，可以避免锁竞争，确保数据安全性。
+
+AOF后台重写 BGREWRITEAOF命令
+aof_rewrite函数会进行大量写入操作，线程将被长时间阻塞，所以Redis将AOF重写程序放到子进程里执行。
+* 子进程重写期间，父进程可以继续处理命令请求。
+* 子进程带有服务器进程的数据副本，使用子进程而不是线程，可以避免使用锁的情况下，包装数据的安全性。
+
+**重写期间，新产生的数据如何处理？**
+
+> 一句话：重写也有缓冲区，Redis会将新的写命令同时也追加到AOF重写的缓冲区（之前是只追加到AOF缓冲区）。
+
+子进程重写的问题：子进程重写期间，父进程还会继续执行命令请求，会造成状态不一致。所以在子进程重写期间，父进程同时要执行三个工作：
+1. 执行客户端发来的命令；
+2. 将执行后的命令追加到AOF缓冲区；
+3. 将执行后的命令追加到AOF重写缓冲区。
+
+当子进程重写完成后，会向父进程发送一个信号，父进程调用信号处理函数。将AOF重写缓冲区中的内容写入新AOF文件中，这样新AOF文件的数据库状态就和当前一致了。最后再将新AOF文件改名覆盖掉现有AOF文件，完成新旧AOF文件的替换。这种方式只有在信号处理函数执行时才会对父进程造成阻塞。
+
+**AOF重写相关配置**
+
+no-appendfsync-on-rewrite 重写期间不允许执行AOF文件写入
+
+默认no，就是允许。
+
+参数说明：AOF重写会占用IO，如果文件过大，耗时会很长，其他IO操作（如AOF文件写入操作）会被阻塞，等待时间长。所以为了防止AOF重写期间一直占用IO，`no-appendfsync-on-rewrite`参数设置为no，允许AOF文件写入执行。允许AOF文件同时写入，能够确保新的命令及时刷盘。如果阻塞AOF的文件写入，在这期间的新命令都会暂存在aof_buf缓存中，由操作系统策略执行文件写入（Linux默认30s刷盘）。如果在这30s内，Redis发生宕机，则aof_buf中的数据会丢失。
+
+#### 文件格式
+
+以Redis命令请求格式保存。
+
+![](/assets/images/redis/aofvsrdb.jpg)
+
+## 主从策略
+
+### 如何复制
+
+Redis可以使用`slaveof`命令，让一台服务器（replica）去复制（replicate）另一台服务器（master）。
+
+### 怎么复制
+
+第一次进行同步，执行`slaveof`命令：发送RDB文件
+
+1. replica客户端发送`sync`命令到master服务端；
+2. master执行`bgsave`命令生成RDB文件，然后将RDB文件发给replica客户端；
+3. replica加载RDB文件，恢复文件数据；
+4. master将`bgsave`期间新接收的写命令也发送给replica客户端，确保数据最终一致。
+
+同步完成后，之后命令传播：发送操作命令
+
+1. master接收到新的写命令时，同时发给replica客户端，确保master和replica数据一致。
+
+**这一版本存在的问题**：
+> replica断线重连后要重新执行`sync`命令。
+
+如果命令传播过程中，replica断线重连，那replica会重新发送`salveof`命令，master再次生成RDB文件，发给replica，replica重新载入RDB文件。
+
+replica每次断线重连，都需要重新只看一遍`sync`命令，这种方式效率低。
+
+新版本的优化：
+
+使用`psync`替换`sync`命令。
+
+`psync`提供完全重同步和部分重同步功能。
+- 完全重同步：类似`sync`命令操作，replica断线重连后重新执行一遍同步操作。
+- 部分重同步：replica断线重连后只处理断线后的复制。
+
+### psync如何实现的
+
+#### 复制偏移量
+
+`psync`的部分重同步功能主要是通过记录复制偏移量实现的。
+
+master的复制偏移量，记录了发送给replica的字节数
+
+replica的复制偏移量，记录了接收到的字节数
+
+通过对比master和replica的复制偏移量可以轻松判断和实现主从的数据一致性。
+
+#### 复制积压缓存区
+
+master每次将写命令发送给replica时，同时也会发个复制积压缓冲区队列（默认1M）。
+
+如果replica断线重连，会将自己的复制偏移量发给master，master比对偏移量位置。从缓冲区队列取出偏差数据，发送给replica。
+
+如果缓冲区队列中没有该偏移量之后的数据，master则会执行全部重同步操作。
+
+### 自动复制
+
+### 主/从切换
