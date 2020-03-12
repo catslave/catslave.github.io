@@ -34,6 +34,8 @@ include /path/to/other.conf 包含其它的redis配置文件
 
 ### SNAPSHOTTING
 
+持久化频率
+
 - save 900 1
 - save 300 10
 - save 60 10000 指定在多长时间内，多少次更新操作，就将数据同步到数据库文件。 例如60秒内有10000次修改操作，就将数据同步到数据库。
@@ -51,9 +53,7 @@ include /path/to/other.conf 包含其它的redis配置文件
 
 ### MEMORY MANAGEMENT
 
-当内存达到上限时，Redis可以配置七种方来释放内存
-> volatile-lru -> Evict using approximated LRU among the keys with an expire set.
-> allkeys-lru -> Evict any key using approximated LRU.
+当内存达到上限时，Redis可以配置六种方来释放内存
 > volatile-lfu -> Evict using approximated LFU among the keys with an expire set.
 > allkeys-lfu -> Evict any key using approximated LFU.
 > volatile-random -> Remove a random key among the ones with an expire set.
@@ -133,19 +133,44 @@ Redis单个实例必须要以cluster集群身份启动才能作为集群节点�
 
 **hset**
 
+**add**
+
+**push**
+
 **设置key的过期时间**
 
 expire/pexpire
 
 setex
 
-### Redis键过期策略
+## 键过期策略
 
+支持三种键过期处理策略
 - 定时
 - 惰性
 - 定期
 
-那如何设置策略？
+Redis使用惰性和定期两种策略
 
-## Lua脚本
-Redis2.6版本开始支持Lua脚本，在服务器嵌入Lua环境，Redis客户端可以使用Lua脚本。
+在持久化AOF和RDB中，和主从复制中这两者是如何处理过期的键？
+
+RDB
+> 持久化：过期的键不持久化到RDB文件中
+> 载入：
+
+AOF：
+> 持久化：过期的键Master会写入DEL删除命令
+> 载入：检查键是否过期
+
+复制：
+> 同步：Master发送DEL命令，Replica执行删除过期键
+
+## 内存淘汰策略
+
+提供六种内存键淘汰策略
+- 默认不淘汰
+- 所有键中，LRU最近最少使用淘汰
+- 所有键中，Radom随机淘汰
+- 被设置了过期的键中，LRU最近最少使用淘汰
+- 被设置了过期的键中，Radom随机淘汰
+- 被设置了过期的键中，TTL存活时间最短的淘汰
