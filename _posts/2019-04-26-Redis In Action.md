@@ -34,12 +34,15 @@ include /path/to/other.conf 包含其它的redis配置文件
 
 ### SNAPSHOTTING
 
+RDB快照方式，Redis的默认持久化方式。
+> 适合小规模数据或丢失一部分数据也不会造成问题的应用
+
 持久化频率
 
 - save 900 1
 - save 300 10
 - save 60 10000 指定在多长时间内，多少次更新操作，就将数据同步到数据库文件。 例如60秒内有10000次修改操作，就将数据同步到数据库。
-- stop-writes-on-bgsave-error yes yes Redis 会创建一个新的后台进程dump_rdb，同步数据。但是如果后台进程出现问题，主进程也会拒绝写入。 
+- stop-writes-on-bgsave-error yes yes Redis 会创建一个新的后台进程dump_rdb，同步数据。但是如果后台进程出现问题，主进程也会拒绝写入。 如果设置为no，即bgsave进程报错，也不影响主进程运行。
 - rdbcompression yes 启用压缩，对字符串进行压缩
 - rdbchecksum yes 启用CRC64校验码
 
@@ -104,10 +107,12 @@ Redis支持AOF和RDB两种持久化方法，两种方式可以同时使用。
 AOF模式的配置参数
 
 - appendonly no 是否启用AOF模式，no 默认不启用
-- appendfsync everysec AOF持久化频率，有3种选项：always 有新数据就刷盘；everysec 每秒刷一次；no 使用操作系统自身的刷盘策略
-- no-appendfsync-on-rewrite no master在刷盘时，会阻止其他刷盘操作
-- auto-aof-rewrite-percentage 100
-- auto-aof-rewrite-min-size 64mb
+- appendfsync everysec AOF持久化频率，有3种选项：always 有新数据写入就刷盘；everysec 每秒刷一次；no 使用操作系统自身的刷盘策略
+- no-appendfsync-on-rewrite no 在AOF重写期间，是否允许执行AOF文件同步。 no 允许，在AOF重写期间，允许AOF文件继续执行写入，新的命令会写入AOF文件；yes 不允许 将会阻塞AOF文件写入，命令暂存在aof缓存中。对于延迟要求高的应用，可以设置为yes。
+> no 重写期间，AOF文件也可以执行写入，这样会存在文件句柄的竞争，造成时延。但安全性高，新的命令会写入AOF文件，即使宕机也可以全部恢复。
+> yes 重写期间，会阻塞appendfsync方法执行，即阻塞AOF缓存写入文件和同步，新命令全部暂存在aof_buf缓存区，由操作系统策略执行写文件（Linux默认30s）。所以如果意外宕机，这期间的数据会丢失。
+- auto-aof-rewrite-percentage 100 AOF文件大小与上一次的大小比率超过100%，触发重写
+- auto-aof-rewrite-min-size 64mb AOF文件超过64M，触发重写
 - aof-load-truncated yes
 - aof-use-rdb-preamble yes
 
