@@ -10,8 +10,9 @@ description: Tomcat8 source SearchingNotes.
 # 1. ClassLoader
 
 `Bootstrap`创建一些列class loads，并创建和启动Catalina实例。
-
-（tomcat为什么要自定义classLoader？1.实现servlet规范中对类加载的要求；2.实现不同webapp的类隔离）
+> tomcat为什么要自定义classLoader？
+> 1. 实现servlet规范中对类加载的要求；
+> 2. 实现不同webapp的类隔离）
 
 `org.apache.catalina.startup.Bootstrap`启动类，main方法启动tomcat，首先调用init方法处理
 化类加载器。这里先启动类加载器`initClassLoaders`。先创建`common classLoader`，再创建
@@ -39,6 +40,7 @@ classloader->commonLoader->serverLoader
 首先创建Digester，启动`org.apache.catalina.core.StandardServer`服务，加载`conf/server.xml`配置文件，解析配置。
 
 StandardServer 类图
+
 ![](/assets/images/how-tomcat-works/StandardServer.png)
 
 Server->Services
@@ -73,6 +75,7 @@ destroyInternal方法销毁所有的Service
 ## 2.1 Connector
 
 Connector 类图
+
 ![](/assets/images/how-tomcat-works/Connector.png)
 
 （一句话概括Connector的功能--2018/03/02）
@@ -84,6 +87,7 @@ Connector 类图
 Connector创建一个Adapter（CoyoteAdapter）和ProtocolHandler（Http11NioProtocol）。Http11NioProtocol创建NioEndpoint（NioEndpoint是Connector中处理客户端连接的核心类，负责创建服务器套接字，并绑定到监听端口；同时还创建accepter线程来接收客户端的连接以及poller线程来处理连接中的读写请求）。
 
 Protocol 类图
+
 ![](/assets/images/how-tomcat-works/Protocol.png)
 
 Http11NioProtocol构造了一个NioEndpoint和Http11ConnectionHandler类。（这里可以不用一步步的嵌套说，直接说Protocol做了什么就可以）同时将handler也保存到endpoint。endpoint接收连接请求，并将请求传给handler处理。
@@ -97,14 +101,19 @@ PollerEvent将事件注册到Socket上，Poller循环
 监听Socket上的事件，一旦有事件注册到Socket上，就处理事件。
 
 NioChannel 类图
+
 ![](/assets/images/how-tomcat-works/NioChannel.png)
 
 Http11Processor 类图
+
 ![](/assets/images/how-tomcat-works/Http11Processor.png)
 
 endpoint如何接收请求？
+
 Endpoint 类图
+
 ![](/assets/images/how-tomcat-works/Endpoint.png)
+
 初始化线程池，创建Acceptor，Acceptor负责监听TCP/IP的连接请求。将请求注册到Poller上。
 AbstractEndpoint:
 createExecutor 创建线程池，'-exec'
@@ -115,6 +124,7 @@ Processor一行行的解析。解析完成后将生成的Request和Response交�
 的service方法，选择容器，调用容器的invoke方法。
 
 InputBuffer 类图
+
 ![](/assets/images/how-tomcat-works/InputBuffer.png)
 
 ## 2.1 Service
@@ -126,11 +136,13 @@ addConnector方法采用跟addService方法类似，使用数组管理Connector�
 # 3. Container
 
 Container 类图
+
 ![](/assets/images/how-tomcat-works/Container.png)
 
 ContainerBase基类实现了Container接口，并持有一个管道Pipeline。管道连接着多个容器。Engine、Host、Context、Wrapper都是容器的实现类。管道会顺序的调用所有容器，管道内的容器需要实现invoke方法。
 
 Value 类图
+
 ![](/assets/images/how-tomcat-works/Value.png)
 
 每个容器都管理着对应的Value，容器实例化的时候创建一个新的Value添加到管道中。管道调用Value的invoke方法。
@@ -138,6 +150,7 @@ Value 类图
 StandardWrapperValue的invoke方法，获取StandardWrapper容器，然后通过getParent方法获取Wrapper的父容器Context。检查Context和Wrapper是否可用，如果可用，Wrapper将通过allocate方法实例化一个Servlet来处理请求。
 
 StandardWrapper的loadServlet方法完成servlet实例化工作，该方法是一个synchronized方法
+
 {% highlight java %}
 public synchronized Servlet loadServlet() throws ServletException {
 	
@@ -156,6 +169,7 @@ public synchronized Servlet loadServlet() throws ServletException {
 Servlet实例化完成后，Wrapper为请求创建一个过滤链ApplicationFilterChain。过滤链会依次调用链上的所有Filter。当链上所有的Filter都处理完成后，最后会调用servlet的service方法。（Servlet是从哪里来？）
 
 ApplicationFilterChain 类图
+
 ![](/assets/images/how-tomcat-works/ApplicationFilterChain.png)
 
 # 4 jasper
