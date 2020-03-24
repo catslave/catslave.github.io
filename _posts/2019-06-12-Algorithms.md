@@ -536,4 +536,25 @@ while(curNode.next != null) {
 
 ### LinkedList
 
+#### 反转单链表
+
+##### 206. Reverse Linked List
+##### 92. Reverse Linked List II
+
+题意：反转链表第n到m个节点
+
+思路：插入法，将要反转的节点插入到上一个节点
+
+##### 19. Remove Nth Node From End of List
+
+思路：双指针，快指针先走n步，然后快慢指针一起走，最后将慢指针下一个元素删除。
+
+##### 61. Rotate List
+##### 143. Reorder List
+##### 234. Palindrome Linked List
+
+题意：判断一个链表是否是回文
+
+思路：将链表转为数组列表，然后通过数组列表进行回文判断
+
 ### 
