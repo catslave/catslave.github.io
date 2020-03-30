@@ -497,6 +497,7 @@ while(curNode.next != null) {
 利用二位数组的特性，从左下角或则右上角开始查找，每次nums[x++/--][y++/--]，每次与target比较可以去掉一行或则一列
 
 ##### 79. Word Search
+
 ##### 81. Search in Rotated Sorted Array II
 
 题意：与33题类似，不过这题的数组元素可能重复。
@@ -510,6 +511,13 @@ while(curNode.next != null) {
 思路：
 
 与二分查找类似，如果`mid>right`，则target一定在右边；如果`mid<right`，则target一定在左边
+
+
+##### 349. Intersection of Two Arrays
+
+题意：两个数组的交集
+
+思路：将其中一个数组转为set集合，然后遍历另一个数组，判断是否在set集合中存在
 
 #### 最大最小子数组问题
 
