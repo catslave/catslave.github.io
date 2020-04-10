@@ -76,7 +76,7 @@ description: 常见设计模式
     public class LazySingleton {
 
         // 这里必须是私有静态变量
-        private static LazySingleton instance;
+        private volatile static LazySingleton instance;
 
         // 1. 构造函数私有化
         private LazySingleton() {}
