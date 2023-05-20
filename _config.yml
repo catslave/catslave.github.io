@@ -25,66 +25,67 @@ url: https://catslave.github.io # production https://catslave.github.io
 
 ## Gem
 gems:
-  - jekyll-paginate
+  # - jekyll-paginate # deprecate
   - jekyll-geo-pattern
   - rouge
   - kramdown
   - jekyll-github-metadata
 
+## jekyll 4.0 newly add
+plugins:
+  - jekyll-paginate
+
 # Build settings
 markdown: kramdown
-highlighter: rouge # rouge
-lsi:         false
+highlighter: coderay # rouge
+lsi: false
 excerpt_separator: "\n\n"
 
-source:      .
+source: .
 destination: ./_site
 
-quiet:    false
+quiet: false
 defaults: []
 
 kramdown:
   input: GFM
-  enable_coderay: true
+  # enable_coderay: true
 
 # Disque
 disque: my_disque_settings # ex. httpdongchuangithubio.disqus.com
 
 # Pagination
 paginate: 10
-paginate_path: 'page:num'
+paginate_path: "page:num"
 
 # Navigation. If you do not like these modules, just remove them :D
 navs:
-  -
-    href: /
+  - href: /
     label: Home
 
   #-
-    #href: /open-source
-    #label: Open-Source
+  #href: /open-source
+  #label: Open-Source
 
-  -
-    href: /blog
+  - href: /blog
     label: Blog
 
   #-
-    #href: /bookmark
-    #label: Bookmark
+  #href: /bookmark
+  #label: Bookmark
 
   #-
-    #href: /about
-    #label: About
+  #href: /about
+  #label: About
 
 # Sidebar to show popular repo
 side_bar_repo_limit: 5 # Number of repos to show
 
 # Google Analytics
 # analytics :
-  # provider : google
-  # google :
-     # tracking_id : 'tracking_id'  # ex. UA-72165600-X
-
+# provider : google
+# google :
+# tracking_id : 'tracking_id'  # ex. UA-72165600-X
 
 # For about.html. Fell free to create your own!
 # skill_software_keywords: [Java, C, C++, Qt, Python, MySQL, Oracle, SQLite, PL/SQL, Design Patterns]
