@@ -37,7 +37,7 @@ plugins:
 
 # Build settings
 markdown: kramdown
-highlighter: coderay # rouge
+highlighter: rouge # rouge
 lsi: false
 excerpt_separator: "\n\n"
 
