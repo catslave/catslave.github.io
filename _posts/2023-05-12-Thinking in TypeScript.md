@@ -9,11 +9,35 @@ description: 什么时候要用TypeScript？它解决了JavaScript的什么问�
 
 对 TypeScript 进行简介
 
+TS 谁发明的，什么时间点，现在是什么版本
+
+TypeScript 是一个基于 JavaScript 的静态类型检查器，能够在编译期间检查代码错误，特别是针对值类型错误的检查，能够给出错误提示。
+
+TypeScript 在 JavaScript 基于上添加了一层 - 类型系统（这里用图表示更直观）。
+
+TS 除了 type checker，还有其它作用吗？
+
+TS 简单实例，安装教程
+
+TS 的类型系统
+
+这里介绍类型系统提供了哪些？
+
+TypeScript 可以根据值类型，自动推导出变量类型。但是有一些值很难推导出类型，例如，json 对象。因此 TypeScript 提供了类型定义，你可以给这些 json 对象定义类型，例如，interface 语法。
+
+JavaScript 提供了 6 个基本原子类型有：boolean, bigint, null, number, string, symbol, undefined. TypeScript 在此基础上扩展了一些类型：any, unkonwn, never, void。以及构建类型 interface 和 type。
+
+介绍 TS 的特性
+
 例如，它是一门强类型语言，基于 ES 规范实现，并覆盖了 JavaScript 的所有语法，可以编译成 JavaScript。
 
 也就是说，TS 也是运行在 JS 引擎上的，需要有 JS 运行时环境，例如，Node.js 或者
 
 那它比 JS 多了什么？
+
+其它类型检查语言
+
+Flow 也是一个 JavaScript 静态类型检查工具，它不是一个新语言，它只是一个 annotation 注解。它直接作用于 JavaScript 代码，使用 Babel 编译器会对添加了注解的 JS 代码进行类型检测。
 
 ### 强类型
 
@@ -33,6 +57,8 @@ TS 在 ES 基础之上，新增了类型定义规范。通过强类型约束，�
 
 类型断言：https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#type-assertions
 省去了一个个属性赋值。
+
+3、Decorators 装饰器
 
 ### 还有其它特点吗？
 
