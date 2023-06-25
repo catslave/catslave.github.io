@@ -19,6 +19,8 @@ TS 除了 type checker，还有其它作用吗？
 
 TS 简单实例，安装教程
 
+你可以通过 node 来安装 typescript，如果你有用 visual studio code，那么可以通过插件来安装 typescript。
+
 TS 的类型系统
 
 这里介绍类型系统提供了哪些？
@@ -59,6 +61,8 @@ TS 在 ES 基础之上，新增了类型定义规范。通过强类型约束，�
 省去了一个个属性赋值。
 
 3、Decorators 装饰器
+
+4、Mixins
 
 ### 还有其它特点吗？
 
